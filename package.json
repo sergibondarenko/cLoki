@@ -41,7 +41,8 @@
     "handlebars-helpers": "^0.10.0",
     "snappy": "^7.0.3",
     "glob": "^7.1.2",
-    "plugnplay": "^3.13.0"
+    "plugnplay": "^3.13.0",
+    "farmhash": "^3.2.1"
   },
   "devDependencies": {
     "jest": "^27.0.5",

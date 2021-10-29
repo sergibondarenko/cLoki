@@ -44,6 +44,7 @@ bnf += Object.values(plugins).map(p => p.bnf).join("\n") + "\n";
 bnf += "user_macro ::=" + Object.values(plugins).map(p => p._main_rule_name).map(n => `<${n}>`).join('|') + "\n";
 
 let compiler = new Compiler();
+console.log(bnf);
 compiler.AddLanguage(bnf , "logql" );
 
 const BNF_CORE_RULES = new Set([

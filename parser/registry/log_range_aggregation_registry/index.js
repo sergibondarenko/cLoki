@@ -1,6 +1,7 @@
 const {getDuration} = require("../common");
 const reg = require("./log_range_agg_reg");
 const {generic_rate} = reg;
+const {hash32WithSeed} = require('farmhash');
 
 
 
@@ -106,5 +107,58 @@ module.exports = {
             },
             matrix: true
         };
+    },
+
+    /**
+     *
+     * @param token {Token}
+     * @param query {registry_types.Request}
+     * @returns {registry_types.Request}
+     */
+    smooth_rate: (token, query) => {
+        query.order_by = {
+            name: ['timestamp_ms'],
+            order: 'ASC'
+        };
+        const duration = getDuration(token);
+        const step = query.ctx.step;
+        let streams = new Map();
+        const send = (emit) => {
+            for (const stream of streams.values()) {
+                for(const val of Object.entries(stream.values)) {
+                    emit({labels: stream.labels, value: val[1] / (duration / 1000), timestamp_ms: val[0]});
+                }
+            }
+            streams = new Map();
+        }
+        query.select = [...query.select.filter(f => !f.endsWith('string')), "'' as string"];
+        query.matrix = true;
+        query.limit = undefined;
+        query.stream = [
+            ...(query.stream || []),
+            (s) => s.remap((emit, e) => {
+                if (!e || !e.labels) {
+                    send(emit);
+                    emit(e);
+                    return;
+                }
+
+                const hash = Object.entries(e.labels).reduce(
+                    (sum, e) => hash32WithSeed(e[1], hash32WithSeed(e[0], sum)), 0);
+                if (!streams.has(hash)) {
+                    streams.set(hash, {labels: Object.entries(e.labels), values: {}});
+                }
+                const stream = streams.get(hash);
+                for (let i = 0; i < duration; i+=step) {
+                    const stepToInc = Math.ceil((parseInt(e.timestamp_ms) + i)/step)*step;
+                    if (stepToInc - parseInt(e.timestamp_ms) > duration) {
+                        continue;
+                    }
+                    stream.values[stepToInc] = stream.values[stepToInc] || 0;
+                    stream.values[stepToInc] += 1;
+                }
+            })
+        ];
+        return query;
     }
 };
